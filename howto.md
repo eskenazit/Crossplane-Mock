@@ -63,7 +63,7 @@ crossplane-rbac-manager-5f56cd5cc6-f74sc   0/1     Init:0/1   0          3s
 
 ### 2-bis Kubernetes provider for Crossplane installation (Optional)
 
-If want crossplane to manage further deployment (to discuss), we need to install a providet to do so.
+If want crossplane to manage further deployment (to discuss), we need to install a provider to do so.
 
 Copy the follwing wode and save it into a **kubernetes-provider.yaml** file
 
