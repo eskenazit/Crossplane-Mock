@@ -117,9 +117,11 @@ helm upgrade -i kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --na
 ```
 
 
-Now let us pause a second for talking about having several gateways on a K8s cluster. CRDs are global to the cluster, which means they are common to all instances. If we were to simply install two kgateways with the helm chart, we would end with the two gateways sharing the same API. In order to avoid this, we need to adrress this at the conf level with some manual  action rather than the helm level. 
+Let us pause for a second for talking about having several gateways on a K8s cluster. 
 
-In order to do so, we first copy the follwing wode and save it into a **gateways.yaml** file
+CRDs are global to the cluster, which means they are common to all instances. Here we simply installed two kgateways with the helm chart, so the two gateways are sharing the same API. In order to avoid this, we would need to take some actions that are outside the scope of this PoC.
+
+Back to the gateways installation, we need to copy the follwing wode and save it into a **gateways.yaml** file
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
