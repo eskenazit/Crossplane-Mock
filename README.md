@@ -1,7 +1,7 @@
 # Crossplane-Mock
 An architecture project to test having a crossplane plane with two Kgateways and some mock APIs
 
-Goal is to setup a k8s cluster with Crossplane as a controler pane and kgateway as a data pane. 
+Goal is to setup a k8s cluster with Crossplane as a controler plane and kgateway as a data plane. 
 
 To validate the architecture we want to implement the simple network diagram below:
 
