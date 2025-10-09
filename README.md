@@ -11,3 +11,4 @@ To validate the architecture we want to implement the simple network diagram bel
 - proxies receive and route the the backend
 - httpbin backend receives and responds to the request
 
+See [howto.md](howto.md) for instructions on how to setup the p.o.c.
