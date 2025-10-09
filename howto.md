@@ -1,13 +1,5 @@
 *Note: all the following wommands were tested on powershell only. They are supposed to be standard, but you might need to adapt to your shell.*
 
-
-Our goal is to implement  the simple network diagram below:
-![image](./network.png)
-
-- Client calls either naftiko.org hostname
-- proxies receive and route the the backend
-- httpbin backend receives and responds to the request
-
 ### Prerequisites 
 - kubectl
 - helm
