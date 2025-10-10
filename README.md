@@ -8,7 +8,8 @@ To validate the architecture we want to implement the simple network diagram bel
 ![image](./network.png)
 
 - Client calls either naftiko.org hostname
-- proxies receive and route the the backend
-- httpbin backend receives and responds to the request
+- Proxies receive and route a backend
+- Backends receive and respond to the request
+- One backhand is installed via helm, the other one with Crossplane as a provider
 
 See [howto.md](howto.md) for instructions on how to setup the p.o.c.
