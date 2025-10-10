@@ -1,0 +1,136 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: httpbin.platform.naftiko.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.naftiko.org/v1alpha1
+    kind: HTTPBin
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: ns
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: Namespace
+                    metadata:
+                      name: httpbin2
+                providerConfigRef:
+                  name: in-cluster
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.namespace
+                toFieldPath: spec.forProvider.manifest.metadata.name
+                policy:
+                  fromFieldPath: Optional
+
+          - name: sa
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: ServiceAccount
+                    metadata:
+                      name: httpbin2
+                      namespace: httpbin2
+                providerConfigRef:
+                  name: in-cluster
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.namespace
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
+                policy:
+                  fromFieldPath: Optional
+
+          - name: svc
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                      name: httpbin2
+                      namespace: httpbin2
+                      labels:
+                        app: httpbin2
+                        service: httpbin2
+                    spec:
+                      ports:
+                        - name: http
+                          port: 8001
+                          targetPort: 8080
+                        - name: tcp
+                          port: 9001
+                      selector:
+                        app: httpbin2
+                providerConfigRef:
+                  name: in-cluster
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.namespace
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
+                policy:
+                  fromFieldPath: Optional
+
+          - name: deploy
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: apps/v1
+                    kind: Deployment
+                    metadata:
+                      name: httpbin2
+                      namespace: httpbin2
+                    spec:
+                      replicas: 1
+                      selector:
+                        matchLabels:
+                          app: httpbin2
+                          version: v1
+                      template:
+                        metadata:
+                          labels:
+                            app: httpbin2
+                            version: v1
+                        spec:
+                          serviceAccountName: httpbin2
+                          containers:
+                            - name: httpbin2
+                              image: docker.io/mccutchen/go-httpbin:v2.6.0
+                              imagePullPolicy: IfNotPresent
+                              command: ["go-httpbin"]
+                              args: ["-port", "8080", "-max-duration", "600s"]
+                              ports:
+                                - containerPort: 8080
+                            - name: curl
+                              image: curlimages/curl:7.83.1
+                              imagePullPolicy: IfNotPresent
+                              resources:
+                                requests:
+                                  cpu: "100m"
+                                limits:
+                                  cpu: "200m"
+                              command: ["tail", "-f", "/dev/null"]
+                providerConfigRef:
+                  name: in-cluster
+

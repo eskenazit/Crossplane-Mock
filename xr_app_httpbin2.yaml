@@ -1,0 +1,5 @@
+apiVersion: platform.naftiko.org/v1alpha1
+kind: HTTPBin
+metadata:
+  name: httpbin2-sample
+spec: {}
