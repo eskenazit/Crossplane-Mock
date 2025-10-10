@@ -55,7 +55,7 @@ crossplane-rbac-manager-5f56cd5cc6-f74sc   0/1     Init:0/1   0          3s
 
 ### 3 Kubernetes provider for Crossplane installation
 
-If want crossplane to manage further deployment (to discuss), we need to install a providet to do so.
+If want crossplane to manage further deployment, we need to install a providet to do so.
 
 Copy the follwing wode and save it into a **kubernetes-provider.yaml** file
 
@@ -71,6 +71,22 @@ spec:
 Then apply your manifest
 ```powershell
 kubectl apply -f kubernetes-provider.yaml
+```
+
+We also need a patch and transformation function for Crossplane's Compositions. Save the following block to *pnt_function.yaml*
+
+```yaml
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-patch-and-transform
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-patch-and-transform:v0.8.2
+```
+
+and apply it to the cluster
+```powershell
+kubectl apply -f pnt_function.yaml
 ```
 
 Now we need to configure the provider to be able to interact with our cluster
