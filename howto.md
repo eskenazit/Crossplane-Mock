@@ -53,9 +53,9 @@ crossplane-9d6976dc5-5wnss                 0/1     Init:0/1   0          3s
 crossplane-rbac-manager-5f56cd5cc6-f74sc   0/1     Init:0/1   0          3s
 ```
 
-### 2-bis Kubernetes provider for Crossplane installation (Optional)
+### 3 Kubernetes provider for Crossplane installation
 
-If want crossplane to manage further deployment (to discuss), we need to install a provider to do so.
+If want crossplane to manage further deployment (to discuss), we need to install a providet to do so.
 
 Copy the follwing wode and save it into a **kubernetes-provider.yaml** file
 
@@ -96,7 +96,7 @@ And apply it
 kubectl apply -f config-in-cluster.yaml
 ```
 
-### 3- Kgateways installation (Manual)
+### 4- Kgateways installation 
 
 We want two gateways, one for internal use and one for external use.
 
@@ -117,11 +117,9 @@ helm upgrade -i kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --na
 ```
 
 
-Let us pause for a second for talking about having several gateways on a K8s cluster. 
+Now let us pause a second for talking about having several gateways on a K8s cluster. CRDs are global to the cluster, which means they are common to all instances. If we were to simply install two kgateways with the helm chart, we would end with the two gateways sharing the same API. In order to avoid this, we need to adrress this at the conf level with some manual  action rather than the helm level. 
 
-CRDs are global to the cluster, which means they are common to all instances. Here we simply installed two kgateways with the helm chart, so the two gateways are sharing the same API. In order to avoid this, we would need to take some actions that are outside the scope of this PoC.
-
-Back to the gateways installation, we need to copy the follwing wode and save it into a **gateways.yaml** file
+In order to do so, we first copy the follwing wode and save it into a **gateways.yaml** file
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -169,7 +167,7 @@ kubectl get pods -n kgateway-system
 But if we check the Envoy proxies, we see that none are deployed yet:
 
 ```powershell
-kubectl -n kgateway-system get deploy,svc,pods -l app=kgateway-proxy -o wide
+kubectl get svc -n kgateway-system -o wide
 
 No resources found in kgateway-system namespace.
 ```
@@ -191,13 +189,56 @@ kgateway-internal   LoadBalancer   10.96.186.8     <pending>     8080:31862/TCP 
 
 Note that you  see a third kgateway. This is not a trafic proxy gateway, this is the controller created by the Helm chart to interally expose health/metric/endpoints endpoints. You can differenciate it with its ClusterIP type instead of LoadBalancer.
 
+We now can setup the routes for our gateways, even if nop app is deployed. Here, we chose to have a future httpbin app served on *internal.naftiko.org* and a future httpbin2 app served *external.naftiko.org*. We do so by creating HTTPRoutes with the following yaml file, saved to **httpbin-routes.yaml** :
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httpbin-external
+  namespace: httpbin2
+spec:
+  parentRefs:
+    - name: kgateway-external
+      namespace: kgateway-system
+  hostnames:
+    - "external.naftiko.org"
+  rules:
+    - backendRefs:
+        - name: httpbin2
+          port: 8001
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: httpbin-internal
+  namespace: httpbin
+spec:
+  parentRefs:
+    - name: kgateway-internal
+      namespace: kgateway-system
+  hostnames:
+    - "internal.naftiko.org"
+  rules:
+    - backendRefs:
+        - name: httpbin2
+          port: 8000
+
+```
+
+and applied it 
+
+```powershell
+kubectl apply -f .\httpbin-routes.yaml
+```
+
 We now can now set our local cluster to listen to ports 9000 and 9001 for our internal and external gaeways and forward it to the porper pods on suitable ports :
 ```powershell
 kubectl port-forward deployment/kgateway-internal -n kgateway-system 9000:8080 &
 kubectl port-forward deployment/kgateway-external -n kgateway-system 9001:8081 &
 ```
 
-### 4-  httpbin app Installation
+### 5-  httpbin app Installation (Helm)
 
 We are now ready to setup the final pieces of the p.o.c. httpbin.
 
@@ -214,60 +255,254 @@ Check your pod is running:
 kubectl -n httpbin get pods
 ```
 
-Then, we expose the app on both our gateways. Here, we chose to have the samme httpbin app served on both gateways respectively by *internal.naftiko.org* and *external.naftiko.org*. We do so by creating HTTPRoutes with the following yaml file, saved to **httpbin-routes.yaml** :
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: httpbin-internal
-  namespace: httpbin
-spec:
-  parentRefs:
-    - name: kgateway-internal
-      namespace: kgateway-system
-  hostnames:
-    - "internal.naftiko.org"
-  rules:
-    - backendRefs:
-        - name: httpbin
-          port: 8000
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: httpbin-external
-  namespace: httpbin
-spec:
-  parentRefs:
-    - name: kgateway-external
-      namespace: kgateway-system
-  hostnames:
-    - "external.naftiko.org"
-  rules:
-    - backendRefs:
-        - name: httpbin
-          port: 8000
-
-```
-
-and applied it 
-
-```powershell
-kubectl apply -f .\httpbin-routes.yaml
-```
-
-
-
-and finally you can test it with your favourite api tool, or curl :
+Since e already setup our gateway and set the port to the proper listener, we can directly check if this is working you can test it with your favourite api tool. Or curl :
 
 ```powershell
 curl -i localhost:9000/headers -H "host: internal.naftiko.org"
-curl -i localhost:9001/headers -H "host: external.naftiko.org"
 ```
 
 
 Output/pyaload shoud look like this :
+
+```
+HTTP/1.1 200 OK
+access-control-allow-credentials: true
+access-control-allow-origin: *
+content-type: application/json; encoding=utf-8
+date: Thu, 09 Oct 2025 11:47:25 GMT
+content-length: 446
+x-envoy-upstream-service-time: 49
+server: envoy
+
+{
+  "headers": {
+    "Accept": [
+      "*/*"
+    ],
+    "Host": [
+      "internal.naftiko.org"
+    ],
+    "User-Agent": [
+      "curl/8.14.1"
+    ],
+    "X-Envoy-Expected-Rq-Timeout-Ms": [
+      "15000"
+    ],
+    "X-Envoy-External-Address": [
+      "127.0.0.1"
+    ],
+    "X-Forwarded-For": [
+      "10.244.0.5"
+    ],
+    "X-Forwarded-Proto": [
+      "http"
+    ],
+    "X-Request-Id": [
+      "5ee8873e-148e-4175-903c-3f514c4b5635"
+    ]
+  }
+}
+```
+
+### 5-  httpbin2 app Installation (Crossplane)
+
+The previous httbin was a classic helm installation, but we want to try to install an app via Crosplane.
+
+First we need to define a Schema (XRD) for this. To do his, we create CompositeResourceDefinition with crossplane by copying the following code to *xrd_httpbin2.yaml*. Note we created the simlpliest checma with no additional parameters for the sake of the example.
+
+```yaml
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: httpbins.platform.naftiko.org
+spec:
+  group: platform.naftiko.org
+  names:
+    kind: HTTPBin
+    plural: httpbins
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+```
+ and applying it to the cluster
+ ```powershell
+  kubectl apply -f xrd_httpbin.yaml
+ ```
+ 
+ Then we need to create a composition instanciating the XRD, which will ber the actual declaration of all services. We conveerted the  https://raw.githubusercontent.com/kgateway-dev/kgateway/refs/heads/v2.0.x/examples/httpbin.yaml to a crossplane Composition. Copy and save the following to a *xr_compo_httpbin2.yaml*
+ 
+ ```yaml
+ apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: httpbin.platform.naftiko.org
+spec:
+  compositeTypeRef:
+    apiVersion: platform.naftiko.org/v1alpha1
+    kind: HTTPBin
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: ns
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: Namespace
+                    metadata:
+                      name: httpbin2
+                providerConfigRef:
+                  name: in-cluster
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.namespace
+                toFieldPath: spec.forProvider.manifest.metadata.name
+                policy:
+                  fromFieldPath: Optional
+
+          - name: sa
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: ServiceAccount
+                    metadata:
+                      name: httpbin2
+                      namespace: httpbin2
+                providerConfigRef:
+                  name: in-cluster
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.namespace
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
+                policy:
+                  fromFieldPath: Optional
+
+          - name: svc
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                      name: httpbin2
+                      namespace: httpbin2
+                      labels:
+                        app: httpbin2
+                        service: httpbin2
+                    spec:
+                      ports:
+                        - name: http
+                          port: 8001
+                          targetPort: 8080
+                        - name: tcp
+                          port: 9001
+                      selector:
+                        app: httpbin2
+                providerConfigRef:
+                  name: in-cluster
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.namespace
+                toFieldPath: spec.forProvider.manifest.metadata.namespace
+                policy:
+                  fromFieldPath: Optional
+
+          - name: deploy
+            base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: apps/v1
+                    kind: Deployment
+                    metadata:
+                      name: httpbin2
+                      namespace: httpbin2
+                    spec:
+                      replicas: 1
+                      selector:
+                        matchLabels:
+                          app: httpbin2
+                          version: v1
+                      template:
+                        metadata:
+                          labels:
+                            app: httpbin2
+                            version: v1
+                        spec:
+                          serviceAccountName: httpbin2
+                          containers:
+                            - name: httpbin2
+                              image: docker.io/mccutchen/go-httpbin:v2.6.0
+                              imagePullPolicy: IfNotPresent
+                              command: ["go-httpbin"]
+                              args: ["-port", "8080", "-max-duration", "600s"]
+                              ports:
+                                - containerPort: 8080
+                            - name: curl
+                              image: curlimages/curl:7.83.1
+                              imagePullPolicy: IfNotPresent
+                              resources:
+                                requests:
+                                  cpu: "100m"
+                                limits:
+                                  cpu: "200m"
+                              command: ["tail", "-f", "/dev/null"]
+                providerConfigRef:
+                  name: in-cluster
+ ```
+
+and apply it to the cluster
+```powershell
+kubectl apply -f xr_compo_httpbin2.yaml
+```
+
+Finally we need to declare an app with an XR file. Copy the following block and save it to *xr_app_httpbin2.yaml*
+```yaml
+apiVersion: platform.naftiko.org/v1alpha1
+kind: HTTPBin
+metadata:
+  name: httpbin2-sample
+spec: {}
+```
+and apply it to the cluster
+```powershell
+kubectl apply -f xr_app_httpbin2.yaml
+```
+
+We already setup our gateway and set the port to the proper listener, so we can directly check if this is working with the following curl command:
+
+```powershell
+curl -i localhost:9001/headers -H "host: external.naftiko.org"
+```
+
+which should render a output lokking like this:
 
 ```
 HTTP/1.1 200 OK
@@ -308,8 +543,3 @@ server: envoy
   }
 }
 ```
-
-
-
-
-
