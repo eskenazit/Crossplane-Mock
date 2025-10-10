@@ -518,7 +518,7 @@ We already setup our gateway and set the port to the proper listener, so we can 
 curl -i localhost:9001/headers -H "host: external.naftiko.org"
 ```
 
-which should render a output lokking like this:
+which should render a output looking like this:
 
 ```
 HTTP/1.1 200 OK
