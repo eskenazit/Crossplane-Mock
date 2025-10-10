@@ -5,7 +5,7 @@ Goal is to setup a k8s cluster with Crossplane as a controler plane and kgateway
 
 To validate the architecture we want to implement the simple network diagram below:
 
-![image](./network.png)
+![image](./network2.png)
 
 - Client calls either naftiko.org hostname
 - Proxies receive and route a backend
